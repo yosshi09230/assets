@@ -289,8 +289,8 @@ tbody tr:hover td{background:var(--surface-2)}
 <section class="view" id="v-settings">
   <div class="grid g-2">
     <div class="card">
-      <h2>GitHubとの接続（この端末）</h2>
-      <div class="sub">変更を保存したり「今すぐ更新」を使うには、GitHubの鍵（トークン）が必要です。端末ごとに1回入れてください。</div>
+      <h2>GitHubとの接続</h2>
+      <div class="sub">トークンはパスワードで暗号化してデータの中に保存されるので、どの端末でもパスワードだけで保存や「今すぐ更新」ができます。期限切れなどで作り直したときは、ここに新しいトークンを入れて保存してください。</div>
       <label class="f">リポジトリ</label><input type="text" id="setRepo">
       <label class="f">トークン</label><input type="password" id="setToken" placeholder="github_pat_…（入っている場合は空欄のままでOK）">
       <div class="row" style="margin-top:12px"><button class="btn primary" id="setConnSave">保存</button><span class="muted" id="setConnState"></span></div>
@@ -386,7 +386,7 @@ function guessRepo(){
 }
 const gh = {
   repo(){ return ls.get("at_repo")||guessRepo(); },
-  token(){ return ls.get("at_token")||""; },
+  token(){ return ls.get("at_token")||MEMTOKEN||""; },
   headers(extra={}){ const h={"Accept":"application/vnd.github+json",...extra}; const t=this.token(); if(t) h.Authorization="Bearer "+t; return h; },
   url(p){ return `https://api.github.com/repos/${this.repo()}/${p}`; },
   async getFile(){
@@ -417,13 +417,15 @@ const gh = {
 };
 
 /* ====================== 状態 ====================== */
-let DB=null, SHA=null, PW=null;
+let DB=null, SHA=null, PW=null, MEMTOKEN="";
 const UI={range:0,cur:"jpy",hist:"rec",sort:{key:"value",dir:-1}};
 
 async function load(){
   const f=await gh.getFile();
   if(!f) return false;
-  DB=await decryptDb(f.content,PW); SHA=f.sha; return true;
+  DB=await decryptDb(f.content,PW); SHA=f.sha;
+  if(DB.secrets&&DB.secrets.gh_token) MEMTOKEN=DB.secrets.gh_token;   // どの端末でもパスワードだけで保存できるように
+  return true;
 }
 /* 最新を取り直してから変更→暗号化→保存（自動更新との競合に強くする） */
 async function save(mutator,msg="data: ページから更新"){
@@ -690,14 +692,14 @@ function renderAnnual(){
 /* ---------- 設定 ---------- */
 function renderSettings(){
   const s=DB.settings;
-  $("#setRepo").value=gh.repo(); $("#setConnState").textContent=gh.token()?"トークン設定済み":"トークン未設定";
+  $("#setRepo").value=gh.repo(); $("#setConnState").textContent=(DB.secrets&&DB.secrets.gh_token)?"トークン設定済み（暗号化してデータに保存・全端末で有効）":gh.token()?"この端末のみ設定済み":"トークン未設定";
   $("#setQqq").value=s.qqq_monthly_usd; $("#setTax").value=((s.div_withholding??0.1)*100).toFixed(1);
   $("#setIbDep").value=s.ibkr_initial_deposit; $("#setStale").value=s.stale_days; $("#setFx").value=s.fx_manual||"";
   $("#logBox").innerHTML=[...(DB.log||[])].reverse().map(l=>`<div class="${l.level}">${fmtDate(l.t)}　${esc(l.msg)}</div>`).join("");
 }
 
 /* ---------- 更新コード ---------- */
-let pendingOps=null;
+let pendingOps=null, pendingId=null;
 function parseCode(txt){
   txt=txt.trim(); if(!txt.startsWith("AT1:")) throw new Error("更新コードの形式が違います（AT1: で始まります）");
   return JSON.parse(new TextDecoder().decode(b64d(txt.slice(4).replace(/\s/g,""))));
@@ -708,18 +710,25 @@ function describeOp(o){
     case "remove_position": return `${o.broker} ${o.symbol} を削除`;
     case "set": return `${o.path} = ${JSON.stringify(o.value)}`;
     case "event": return `ログ追加: ${o.detail}`;
+    case "add_manual": return `口座を追加: ${o.item.name} ${o.item.currency==="USD"?fmtU(o.item.value):fmtJ(o.item.value)}（同じ名前があれば追加しない）`;
+    case "shift_history": return `今までの履歴すべてに ${fmtJ(o.amount_jpy,true)} を足す（${DB?DB.history.length:""}件）`;
     default: return "不明な操作: "+o.op;
   }
 }
-function applyOps(db,ops){
+function applyOps(db,ops,codeId){
+  db.applied_codes ||= [];
+  if(codeId&&db.applied_codes.includes(codeId)) throw new Error("この更新コードは取り込み済みです");
   for(const o of ops){
     if(o.op==="set_position"){ const list=db[o.broker].positions; let p=list.find(x=>x.symbol===o.symbol);
       if(!p){ p={symbol:o.symbol,name:o.name||o.symbol,qty:0,unit_cost:0,price:o.price||0}; list.push(p); }
       p.qty=o.qty; p.unit_cost=o.unit_cost; if(o.name) p.name=o.name; if(o.div_per_share!=null) p.div_per_share=o.div_per_share; }
     else if(o.op==="remove_position"){ db[o.broker].positions=db[o.broker].positions.filter(x=>x.symbol!==o.symbol); }
     else if(o.op==="set"){ const k=o.path.split("."); let t=db; while(k.length>1) t=t[k.shift()]; t[k[0]]=o.value; }
+    else if(o.op==="add_manual"){ if(!db.manual.some(m=>m.id===o.item.id||m.name===o.item.name)) db.manual.push({...o.item,updated_at:nowIso()}); }
+    else if(o.op==="shift_history"){ for(const h of db.history){ h.jpy=+(h.jpy+o.amount_jpy).toFixed(2); if(h.usd!=null&&h.fx) h.usd=+(h.usd+o.amount_jpy/h.fx).toFixed(2); if(h.parts) h.parts.jpy=+((h.parts.jpy||0)+o.amount_jpy).toFixed(2); } }
     else if(o.op==="event"){ (db[o.broker||"firstrade"].events ||= []).push({t:nowIso(),type:"correction",detail:o.detail}); }
   }
+  if(codeId) db.applied_codes.push(codeId);
 }
 
 /* ====================== モーダル・操作 ====================== */
@@ -742,14 +751,16 @@ $("#btnRefresh").onclick=()=>guarded($("#btnRefresh"),async()=>{
   for(let i=0;i<14;i++){ await new Promise(r=>setTimeout(r,15000)); try{ await load(); }catch(e){} if(DB.updated_at!==before){ render(); toast("最新のデータに更新しました"); return; } }
   toast("まだ反映されていません。少し後にページを開き直してください",5000);
 });
-$("#setConnSave").onclick=()=>{ ls.set("at_repo",$("#setRepo").value.trim()); const t=$("#setToken").value.trim(); if(t) ls.set("at_token",t); $("#setToken").value=""; renderSettings(); toast("この端末に保存しました"); };
+$("#setConnSave").onclick=()=>guarded($("#setConnSave"),async()=>{ ls.set("at_repo",$("#setRepo").value.trim()); const t=$("#setToken").value.trim();
+  if(t){ MEMTOKEN=t; ls.set("at_token",t); await save(db=>{ db.secrets={...(db.secrets||{}),gh_token:t}; },"data: トークンを更新"); }
+  $("#setToken").value=""; renderSettings(); toast(t?"トークンを保存しました（全端末で使えます）":"保存しました"); });
 $("#setSave").onclick=()=>guarded($("#setSave"),async()=>{ const s={qqq_monthly_usd:parseFloat($("#setQqq").value)||0,div_withholding:(parseFloat($("#setTax").value)||0)/100,ibkr_initial_deposit:parseFloat($("#setIbDep").value)||0,stale_days:parseInt($("#setStale").value)||30,fx_manual:parseFloat($("#setFx").value)||null};
   await save(db=>{ Object.assign(db.settings,s); if(s.fx_manual) db.fx={rate:s.fx_manual,at:nowIso(),source:"手動"}; },"data: 設定を変更"); toast("保存しました"); });
 $("#codePreview").onclick=()=>{ const out=$("#codeOut"); out.classList.remove("hidden");
-  try{ const c=parseCode($("#codeIn").value); pendingOps=c.ops||[]; out.innerHTML=`<div><b>${esc(c.title||"更新コード")}</b>（${pendingOps.length}件）</div>`+pendingOps.map(o=>`<div>・${esc(describeOp(o))}</div>`).join(""); $("#codeApply").disabled=false; }
+  try{ const c=parseCode($("#codeIn").value); pendingOps=c.ops||[]; pendingId=c.id||null; out.innerHTML=`<div><b>${esc(c.title||"更新コード")}</b>（${pendingOps.length}件）</div>`+pendingOps.map(o=>`<div>・${esc(describeOp(o))}</div>`).join(""); $("#codeApply").disabled=false; }
   catch(e){ pendingOps=null; out.innerHTML=`<div class="warn">${esc(e.message)}</div>`; $("#codeApply").disabled=true; } };
-$("#codeApply").onclick=()=>guarded($("#codeApply"),async()=>{ const ops=pendingOps; await save(db=>applyOps(db,ops),"data: 更新コードを取り込み"); $("#codeIn").value=""; $("#codeOut").classList.add("hidden"); $("#codeApply").disabled=true; toast("取り込みました"); });
-$("#btnBackup").onclick=async()=>{ try{ await navigator.clipboard.writeText(JSON.stringify(DB)); toast("コピーしました"); }catch(e){ toast("コピーできませんでした"); } };
+$("#codeApply").onclick=()=>guarded($("#codeApply"),async()=>{ const ops=pendingOps, cid=pendingId; await save(db=>applyOps(db,ops,cid),"data: 更新コードを取り込み"); $("#codeIn").value=""; $("#codeOut").classList.add("hidden"); $("#codeApply").disabled=true; toast("取り込みました"); });
+$("#btnBackup").onclick=async()=>{ try{ const {secrets,...rest}=DB; await navigator.clipboard.writeText(JSON.stringify(rest)); toast("コピーしました（トークンは除いています）"); }catch(e){ toast("コピーできませんでした"); } };
 $("#btnLock").onclick=()=>{ ss.del("at_pw"); location.reload(); };
 
 /* ====================== ロック・初期設定 ====================== */
@@ -759,6 +770,11 @@ async function unlock(pw){
   if(!ok){ PW=null; throw Object.assign(new Error("まだデータがありません。「初期設定」から始めてください"),{nodata:true}); }
   $("#lockView").classList.add("hidden"); $("#appView").classList.remove("hidden");
   render(); showView((location.hash||"#dash").slice(1)||"dash");
+  const local=ls.get("at_token");
+  if(local&&(!DB.secrets||DB.secrets.gh_token!==local)){
+    try{ await save(db=>{ db.secrets={...(db.secrets||{}),gh_token:local}; },"data: トークンを暗号化して保存"); toast("この端末のトークンをデータに保存しました。他の端末でもパスワードだけで使えます",4500); }
+    catch(e){ console.warn(e); }
+  }
 }
 $("#lockForm").addEventListener("submit",async e=>{ e.preventDefault(); const pw=$("#lockPw").value; if(!pw) return;
   $("#lockErr").textContent=""; $("#lockBtn").disabled=true; $("#lockBtn").textContent="確認中…";
@@ -777,6 +793,7 @@ $("#suGo").onclick=()=>guarded($("#suGo"),async()=>{
     ls.set("at_repo",repo); ls.set("at_token",tok);
     const seed=JSON.parse(await file.text()); if(!seed.history||!seed.manual) throw new Error("seed.json の中身が正しくありません");
     const existing=await gh.getFile(); if(existing) throw new Error("すでにデータがあります。上書きを防ぐため中止しました（作り直す場合はGitHubで data/db.enc を削除してください）");
+    seed.secrets={gh_token:tok};
     PW=p1; await gh.putFile(await encryptDb(seed,p1),null,"data: 初期データ");
     $("#setupView").classList.add("hidden"); await unlock(p1); toast("初期設定が完了しました",4000);
   }catch(e){ $("#suErr").textContent=e.message; }
