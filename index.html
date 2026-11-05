@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>資産ダッシュボード</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f4f3f0; --surface:#fcfcfb; --surface-2:#f0efec; --line:#e3e1dc;
+  --text:#0b0b0b; --text-2:#52514e; --muted:#8a8984;
+  --accent:#2a78d6; --accent-ink:#ffffff;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4;
+  --good:#0f7b3f; --bad:#c62f2f; --warn-bg:#fff4dc; --warn-ink:#7a5200;
+  --radius:14px; --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    color-scheme:dark;
+    --bg:#121211; --surface:#1a1a19; --surface-2:#242422; --line:#33322f;
+    --text:#f0efec; --text-2:#c3c2b7; --muted:#8f8e86;
+    --accent:#3987e5;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
+    --good:#4cc47f; --bad:#ef6b6b; --warn-bg:#3a2e12; --warn-ink:#f2c86b;
+    --shadow:none;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,"Noto Sans JP",system-ui,sans-serif;font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.num{font-family:Inter,"Noto Sans JP",sans-serif;font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent)}
+.hidden{display:none!important}
+.row>input{flex:1;width:auto;min-width:0}
+.acc .row>b{flex:1;min-width:0}
+
+/* ---- レイアウト ---- */
+header.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.top-inner{max-width:1180px;margin:0 auto;padding:10px 20px;display:flex;align-items:center;gap:16px}
+.brand{font-weight:700;letter-spacing:.01em;white-space:nowrap}
+nav.tabs{display:flex;gap:4px;overflow-x:auto;flex:1;scrollbar-width:none}
+nav.tabs button{border:0;background:transparent;padding:8px 12px;border-radius:999px;color:var(--text-2);white-space:nowrap;font-weight:500}
+nav.tabs button[aria-current="page"]{background:var(--text);color:var(--bg)}
+.top-actions{display:flex;gap:8px;align-items:center}
+main{max-width:1180px;margin:0 auto;padding:22px 20px 80px}
+.grid{display:grid;gap:16px}
+.g-hero{grid-template-columns:1.4fr 1fr}
+.g-3{grid-template-columns:repeat(3,1fr)}
+.g-2{grid-template-columns:1fr 1fr}
+@media (max-width:860px){.g-hero,.g-2,.g-3{grid-template-columns:1fr}.top-inner{flex-wrap:wrap}.brand{order:1}.top-actions{order:2;margin-left:auto}nav.tabs{order:3;flex-basis:100%}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);min-width:0}
+.card h2{font-size:15px;margin:0 0 12px;font-weight:600}
+.card h3{font-size:13px;margin:0 0 6px;color:var(--text-2);font-weight:500}
+.sub{color:var(--text-2);font-size:13px}
+.muted{color:var(--muted);font-size:12px}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.spacer{flex:1}
+section.view{display:none}
+section.view.active{display:block}
+.section-title{display:flex;align-items:end;gap:12px;margin:26px 0 12px}
+.section-title h2{margin:0;font-size:18px}
+
+/* ---- ヒーロー ---- */
+.hero-label{color:var(--text-2);font-size:13px;font-weight:500}
+.hero-value{font-size:44px;font-weight:700;letter-spacing:-.02em;line-height:1.1;margin:6px 0 2px}
+.hero-usd{font-size:18px;color:var(--text-2);font-weight:500}
+@media (max-width:520px){.hero-value{font-size:34px}}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.kpi{background:var(--surface-2);border-radius:10px;padding:12px 14px}
+.kpi .v{font-size:19px;font-weight:600;margin-top:2px}
+.pos{color:var(--good)} .neg{color:var(--bad)}
+
+/* ---- ボタン・入力 ---- */
+.btn{border:1px solid var(--line);background:var(--surface);padding:7px 14px;border-radius:10px;font-weight:500;font-size:14px}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.small{padding:4px 10px;font-size:13px}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--text-2)}
+.btn.danger{color:var(--bad)}
+.btn:disabled{opacity:.5;cursor:default}
+.seg{display:inline-flex;background:var(--surface-2);border-radius:10px;padding:3px}
+.seg button{border:0;background:transparent;padding:5px 11px;border-radius:8px;font-size:13px;color:var(--text-2);font-weight:500}
+.seg button.on{background:var(--surface);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+input[type=text],input[type=password],input[type=number],textarea,select{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 12px;outline:none}
+input:focus,textarea:focus{border-color:var(--accent)}
+label.f{display:block;font-size:13px;color:var(--text-2);margin:12px 0 4px;font-weight:500}
+
+/* ---- 表 ---- */
+.table-wrap{overflow-x:auto;margin:0 -4px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{text-align:right;font-weight:500;color:var(--text-2);font-size:12px;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;cursor:default}
+th.sortable{cursor:pointer}
+td{text-align:right;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+td.l,th.l{text-align:left}
+tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:var(--surface-2)}
+.tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:999px;background:var(--surface-2);color:var(--text-2);font-weight:500}
+.tag.auto{background:color-mix(in srgb,var(--s1) 16%,transparent);color:var(--s1)}
+.tag.manual{background:color-mix(in srgb,var(--s4) 20%,transparent);color:var(--warn-ink)}
+.tag.memo{background:color-mix(in srgb,var(--s2) 16%,transparent);color:var(--s2)}
+
+/* ---- 配分 ---- */
+.alloc{display:grid;grid-template-columns:170px 1fr;gap:18px;align-items:center}
+@media (max-width:520px){.alloc{grid-template-columns:1fr}}
+.legend-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+.legend-row:last-child{border-bottom:0}
+.sw{width:10px;height:10px;border-radius:3px;flex:none}
+.bar{height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden;margin-top:4px}
+.bar>i{display:block;height:100%;border-radius:3px}
+
+/* ---- 手入力カード ---- */
+.acc{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.acc .card{padding:14px 16px}
+.acc .val{font-size:22px;font-weight:600;margin:4px 0}
+.stale{border-color:var(--s4)!important}
+.stale-note{background:var(--warn-bg);color:var(--warn-ink);font-size:12px;border-radius:6px;padding:2px 8px;display:inline-block}
+
+/* ---- 画面全体のモーダル ---- */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.modal{background:var(--surface);border-radius:16px;padding:22px;width:100%;max-width:460px;max-height:92vh;overflow:auto;border:1px solid var(--line)}
+.modal h2{margin:0 0 6px;font-size:18px}
+.lock{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.lock .modal{max-width:400px;box-shadow:var(--shadow)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:10px 18px;border-radius:999px;font-size:14px;z-index:60;max-width:90vw}
+.chart-box{position:relative;height:320px}
+@media (max-width:520px){.chart-box{height:240px}}
+.donut-box{position:relative;height:170px}
+.chart-box svg,.donut-box svg{display:block;width:100%;height:100%;overflow:visible}
+.ax{fill:var(--muted);font-size:11px;font-family:Inter,sans-serif}
+.tip{position:absolute;pointer-events:none;background:var(--text);color:var(--bg);font-size:12px;padding:7px 10px;border-radius:8px;white-space:nowrap;transform:translate(-50%,-110%);z-index:5;max-width:260px;white-space:normal}
+.tip b{font-size:14px}
+.err{color:var(--bad);font-size:13px;margin-top:8px}
+.log{font-family:ui-monospace,Menlo,monospace;font-size:12px;max-height:240px;overflow:auto;background:var(--surface-2);border-radius:8px;padding:8px 10px}
+.log div{padding:2px 0}
+.log .warn{color:var(--warn-ink)}
+</style>
+</head>
+<body>
+
+<!-- ===== ロック画面 ===== -->
+<div id="lockView" class="lock">
+  <div class="modal">
+    <h2>資産ダッシュボード</h2>
+    <p class="sub" id="lockMsg">パスワードを入力してください。</p>
+    <form id="lockForm">
+      <input type="password" id="lockPw" autocomplete="current-password" placeholder="パスワード">
+      <label class="row" style="margin-top:10px;font-size:13px;color:var(--text-2)"><input type="checkbox" id="lockRemember" style="width:auto"> このタブを閉じるまで覚えておく</label>
+      <div class="row" style="margin-top:14px"><button class="btn primary" type="submit" id="lockBtn">開く</button><span class="spacer"></span><button class="btn ghost small" type="button" id="toSetup">初期設定</button></div>
+      <div class="err" id="lockErr"></div>
+    </form>
+  </div>
+</div>
+
+<!-- ===== 初期設定 ===== -->
+<div id="setupView" class="lock hidden">
+  <div class="modal" style="max-width:520px">
+    <h2>初期設定</h2>
+    <p class="sub">最初に1回だけ行います。手順書の「3. ページの初期設定と動作確認」と同じ内容です。</p>
+    <label class="f">1. パスワードを決める（GitHubのSecrets「DATA_PASSWORD」と同じものにします）</label>
+    <input type="password" id="suPw1" placeholder="パスワード（10文字以上・推測されにくいもの）" autocomplete="new-password">
+    <input type="password" id="suPw2" placeholder="もう一度" style="margin-top:6px" autocomplete="new-password">
+    <label class="f">2. GitHubの鍵（トークン）を貼る</label>
+    <input type="password" id="suToken" placeholder="github_pat_…">
+    <label class="f">3. リポジトリ（自動で入ります。違っていたら直してください）</label>
+    <input type="text" id="suRepo" placeholder="ユーザー名/リポジトリ名">
+    <label class="f">4. 初期データ（seed.json）を選ぶ</label>
+    <input type="file" id="suFile" accept=".json,application/json">
+    <div class="row" style="margin-top:16px"><button class="btn primary" id="suGo">暗号化して保存</button><span class="spacer"></span><button class="btn ghost small" id="suBack">戻る</button></div>
+    <div class="err" id="suErr"></div>
+    <p class="muted" style="margin-top:12px">初期データはこの端末の中で暗号化してから送るので、GitHubには暗号化された状態でしか保存されません。</p>
+  </div>
+</div>
+
+<!-- ===== 本体 ===== -->
+<div id="appView" class="hidden">
+<header class="top"><div class="top-inner">
+  <div class="brand">資産ダッシュボード</div>
+  <nav class="tabs" id="tabs">
+    <button data-v="dash" aria-current="page">ダッシュボード</button>
+    <button data-v="stocks">株</button>
+    <button data-v="manual">Crypto・手入力</button>
+    <button data-v="history">履歴</button>
+    <button data-v="annual">年次実績</button>
+    <button data-v="settings">設定</button>
+  </nav>
+  <div class="top-actions">
+    <button class="btn small" id="btnRefresh" title="GitHubで今すぐ取得を実行">今すぐ更新</button>
+    <button class="btn small primary" id="btnSnap">記録する</button>
+  </div>
+</div></header>
+
+<main>
+<!-- ダッシュボード -->
+<section class="view active" id="v-dash">
+  <div class="grid g-hero">
+    <div class="card">
+      <div class="hero-label">総資産</div>
+      <div class="hero-value num" id="heroJpy">—</div>
+      <div class="hero-usd num" id="heroUsd">—</div>
+      <div class="muted" style="margin-top:10px" id="heroMeta">—</div>
+      <div id="heroParts" style="margin-top:14px"></div>
+    </div>
+    <div class="kpis">
+      <div class="kpi"><h3>前回の記録から</h3><div class="v num" id="kPrev">—</div><div class="muted" id="kPrevSub"></div></div>
+      <div class="kpi"><h3>24時間</h3><div class="v num" id="k24">—</div><div class="muted" id="k24Sub"></div></div>
+      <div class="kpi"><h3 id="kYtdLabel">年初来</h3><div class="v num" id="kYtd">—</div><div class="muted" id="kYtdSub"></div></div>
+      <div class="kpi"><h3>過去最高</h3><div class="v num" id="kMax">—</div><div class="muted" id="kMaxSub"></div></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="row" style="margin-bottom:10px">
+      <h2 style="margin:0">資産推移</h2><span class="spacer"></span>
+      <div class="seg" id="segRange">
+        <button data-r="7">1週間</button><button data-r="30">1か月</button><button data-r="182">半年</button><button data-r="365">1年</button><button data-r="0" class="on">全期間</button>
+      </div>
+      <div class="seg" id="segCur"><button data-c="jpy" class="on">円</button><button data-c="usd">ドル</button></div>
+    </div>
+    <div class="chart-box" id="chartMain" role="img" aria-label="資産推移グラフ"></div>
+    <div class="muted" style="margin-top:6px">● 大きい点はメモ付きの記録です。点にカーソルを合わせる（タップする）とメモが出ます。ドル表示は自動記録が始まってからの期間のみです。</div>
+  </div>
+
+  <div class="grid g-2" style="margin-top:16px">
+    <div class="card">
+      <h2>資産配分</h2>
+      <div class="alloc"><div class="donut-box" id="chartDonut" role="img" aria-label="資産配分"></div><div id="allocList"></div></div>
+    </div>
+    <div class="card">
+      <h2>年ごとの増加額</h2>
+      <div class="table-wrap"><table id="tblYears"><thead><tr><th>年</th><th>年末（最新）</th><th>増加額</th><th>増加率</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+</section>
+
+<!-- 株 -->
+<section class="view" id="v-stocks">
+  <div class="grid g-3">
+    <div class="card"><h3>株 合計</h3><div class="hero-value num" style="font-size:28px" id="stTotal">—</div><div class="sub num" id="stTotalJpy"></div></div>
+    <div class="card"><h3>株ハイリスク（IBKR）</h3><div class="hero-value num" style="font-size:28px" id="stIb">—</div><div class="sub num" id="stIbSub"></div></div>
+    <div class="card"><h3>株積み立て（Firstrade）</h3><div class="hero-value num" style="font-size:28px" id="stFt">—</div><div class="sub num" id="stFtSub"></div></div>
+  </div>
+
+  <div class="section-title"><h2>IBKR</h2><span class="muted" id="ibMeta"></span></div>
+  <div class="card" id="ibManualBox">
+    <div class="sub">IBKRの自動取得（Flex）がまだ設定されていないので、手入力の評価額を使っています。設定すると銘柄別に表示されます。</div>
+    <div class="row" style="margin-top:10px;max-width:420px"><input type="number" step="0.01" id="ibManualVal"><button class="btn" id="ibManualSave">保存</button></div>
+  </div>
+  <div class="card" id="ibTableBox"><div class="table-wrap"><table id="tblIb"></table></div></div>
+
+  <div class="section-title"><h2>Firstrade</h2><span class="muted" id="ftMeta"></span></div>
+  <div class="card"><div class="table-wrap"><table id="tblFt"></table></div></div>
+  <div class="grid g-2" style="margin-top:16px">
+    <div class="card"><h2>配当の見込み（年間・税引後）</h2><div class="hero-value num" style="font-size:26px" id="ftDivYear">—</div><div class="sub" id="ftDivSub"></div></div>
+    <div class="card"><h2>Firstradeの自動反映ログ</h2><div class="log" id="ftEvents"></div><div class="muted" style="margin-top:6px">配当（現金）と毎月のQQQ積立は自動で推定して反映します。ずれたらHistoryのスクショをClaudeに渡して「更新コード」をもらい、設定画面で取り込んでください。</div></div>
+  </div>
+</section>
+
+<!-- 手入力 -->
+<section class="view" id="v-manual">
+  <div class="row"><div><h2 style="margin:0;font-size:18px">Crypto・手入力の口座</h2><div class="sub">カードの金額を押すと書き換えられます。</div></div><span class="spacer"></span><button class="btn" id="btnAddAcc">＋ 口座を追加</button></div>
+  <div class="section-title"><h2 style="font-size:15px">ドル資産</h2><span class="muted num" id="manUsdSum"></span></div>
+  <div class="acc" id="accUsd"></div>
+  <div class="section-title"><h2 style="font-size:15px">円資産</h2><span class="muted num" id="manJpySum"></span></div>
+  <div class="acc" id="accJpy"></div>
+</section>
+
+<!-- 履歴 -->
+<section class="view" id="v-history">
+  <div class="row"><h2 style="margin:0;font-size:18px">履歴</h2><span class="spacer"></span>
+    <div class="seg" id="segHist"><button data-h="rec" class="on">記録のみ</button><button data-h="daily">毎日</button><button data-h="all">すべて</button></div>
+  </div>
+  <div class="card" style="margin-top:12px"><div class="table-wrap"><table id="tblHist"><thead><tr><th>日時</th><th class="l">種類</th><th>総資産</th><th>前の行から</th><th>ドル円</th><th class="l">メモ</th><th></th></tr></thead><tbody></tbody></table></div></div>
+</section>
+
+<!-- 年次 -->
+<section class="view" id="v-annual">
+  <h2 style="margin:0 0 4px;font-size:18px">Cryptoの年次実績</h2>
+  <div class="sub">2025年までは確定値です（自動では変わりません）。2026年は進行中です。</div>
+  <div class="card" style="margin-top:12px"><div class="table-wrap"><table id="tblAnnual"></table></div></div>
+  <div class="row" style="margin-top:12px"><span class="sub num" id="annualTotal"></span></div>
+</section>
+
+<!-- 設定 -->
+<section class="view" id="v-settings">
+  <div class="grid g-2">
+    <div class="card">
+      <h2>GitHubとの接続（この端末）</h2>
+      <div class="sub">変更を保存したり「今すぐ更新」を使うには、GitHubの鍵（トークン）が必要です。端末ごとに1回入れてください。</div>
+      <label class="f">リポジトリ</label><input type="text" id="setRepo">
+      <label class="f">トークン</label><input type="password" id="setToken" placeholder="github_pat_…（入っている場合は空欄のままでOK）">
+      <div class="row" style="margin-top:12px"><button class="btn primary" id="setConnSave">保存</button><span class="muted" id="setConnState"></span></div>
+    </div>
+    <div class="card">
+      <h2>自動反映の設定</h2>
+      <label class="f">毎月のQQQ積立額（ドル）</label><input type="number" id="setQqq">
+      <label class="f">配当の源泉税率（%）</label><input type="number" id="setTax" step="0.1">
+      <label class="f">IBKRの初期入金額（ドル）</label><input type="number" id="setIbDep" step="0.01">
+      <label class="f">更新が古いと知らせる日数</label><input type="number" id="setStale">
+      <label class="f">ドル円を手動で固定（空欄なら自動）</label><input type="number" id="setFx" step="0.001">
+      <div class="row" style="margin-top:12px"><button class="btn primary" id="setSave">保存</button></div>
+    </div>
+    <div class="card">
+      <h2>更新コードの取り込み</h2>
+      <div class="sub">Claudeが作った「更新コード」を貼り付けて取り込みます（Firstradeの補正など）。</div>
+      <textarea id="codeIn" rows="5" style="margin-top:10px" placeholder="AT1:…"></textarea>
+      <div class="row" style="margin-top:10px"><button class="btn" id="codePreview">内容を確認</button><button class="btn primary" id="codeApply" disabled>取り込む</button></div>
+      <div class="log hidden" id="codeOut" style="margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <h2>動作ログ</h2>
+      <div class="log" id="logBox"></div>
+      <div class="row" style="margin-top:12px"><button class="btn" id="btnBackup">バックアップをコピー</button><button class="btn" id="btnLock">ロックする</button></div>
+      <div class="muted" style="margin-top:6px">バックアップは復号した中身（JSON）をクリップボードにコピーします。扱いに注意してください。</div>
+    </div>
+  </div>
+</section>
+</main>
+</div>
+
+<!-- 汎用モーダル -->
+<div id="modal" class="overlay hidden"><div class="modal" id="modalBody"></div></div>
+<div id="toast" class="toast hidden"></div>
+
+<script>
+"use strict";
+/* ====================== 基本 ====================== */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const ITER = 250000;
+const DB_FILE = "data/db.enc";
+const WORKFLOW = "update.yml";
+const CAT = {
+  ibkr:{name:"株ハイリスク（IBKR）",color:"--s1"},
+  firstrade:{name:"株積み立て（Firstrade）",color:"--s2"},
+  crypto:{name:"Crypto",color:"--s3"},
+  usd_cash:{name:"ドル現金",color:"--s4"},
+  jpy:{name:"円資産（純額）",color:"--s5"},
+};
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmtJ = (v,sign) => (v==null||isNaN(v))?"—":(sign&&v>0?"+":"")+(v<0?"-":"")+"¥"+Math.round(Math.abs(v)).toLocaleString("ja-JP");
+const fmtU = (v,sign,d=0) => (v==null||isNaN(v))?"—":(sign&&v>0?"+":"")+(v<0?"-":"")+"$"+Math.abs(v).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmtP = (v,sign=true) => (v==null||!isFinite(v))?"—":(sign&&v>0?"+":"")+(v*100).toFixed(2)+"%";
+const fmtN = (v,d=2) => (v==null||isNaN(v))?"—":Number(v).toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+const cls = v => v>0?"pos":v<0?"neg":"";
+const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const nowIso = () => { const d=new Date(); const t=new Date(d.getTime()+9*3600e3); return t.toISOString().slice(0,19)+"+09:00"; };
+/* 日付はすべて日本時間で表示（海外にいても同じ表示になるように） */
+const J = t => { const d=new Date(new Date(t).getTime()+9*3600e3); return {y:d.getUTCFullYear(),m:d.getUTCMonth()+1,d:d.getUTCDate(),h:d.getUTCHours(),mi:d.getUTCMinutes()}; };
+const fmtDate = (t,withTime=true) => { const j=J(t); const p=n=>String(n).padStart(2,"0");
+  const s=`${j.y}/${j.m}/${j.d}`; return withTime?`${s} ${p(j.h)}:${p(j.mi)}`:s; };
+const jstYearStart = y => Date.UTC(y,0,1)-9*3600e3;
+const ago = t => { if(!t) return "未取得"; const m=(Date.now()-new Date(t))/60000; if(m<1)return"たった今"; if(m<60)return Math.round(m)+"分前"; if(m<1440)return Math.round(m/60)+"時間前"; return Math.round(m/1440)+"日前"; };
+function toast(msg,ms=2600){ const t=$("#toast"); t.textContent=msg; t.classList.remove("hidden"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.add("hidden"),ms); }
+const ls = { get(k){try{return localStorage.getItem(k)}catch(e){return null}}, set(k,v){try{localStorage.setItem(k,v)}catch(e){}} };
+const ss = { get(k){try{return sessionStorage.getItem(k)}catch(e){return null}}, set(k,v){try{sessionStorage.setItem(k,v)}catch(e){}}, del(k){try{sessionStorage.removeItem(k)}catch(e){}} };
+
+/* ====================== 暗号化（Python側と同じ形式） ====================== */
+const b64e = buf => { let s=""; const b=new Uint8Array(buf); for(let i=0;i<b.length;i+=0x8000) s+=String.fromCharCode(...b.subarray(i,i+0x8000)); return btoa(s); };
+const b64d = s => Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function deriveKey(pw,salt,iter){
+  const base=await crypto.subtle.importKey("raw",new TextEncoder().encode(pw),"PBKDF2",false,["deriveKey"]);
+  return crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:iter,hash:"SHA-256"},base,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
+}
+async function decryptDb(text,pw){
+  const o=JSON.parse(text); const key=await deriveKey(pw,b64d(o.salt),o.iter||ITER);
+  const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64d(o.iv)},key,b64d(o.ct));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+async function encryptDb(obj,pw){
+  const salt=crypto.getRandomValues(new Uint8Array(16)), iv=crypto.getRandomValues(new Uint8Array(12));
+  const key=await deriveKey(pw,salt,ITER);
+  const ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,new TextEncoder().encode(JSON.stringify(obj)));
+  return JSON.stringify({v:1,iter:ITER,salt:b64e(salt),iv:b64e(iv),ct:b64e(ct)});
+}
+
+/* ====================== GitHub ====================== */
+function guessRepo(){
+  const h=location.hostname, seg=location.pathname.split("/").filter(Boolean)[0];
+  if(h.endsWith(".github.io")){ const user=h.replace(".github.io",""); return seg?`${user}/${seg}`:`${user}/${h}`; }
+  return "";
+}
+const gh = {
+  repo(){ return ls.get("at_repo")||guessRepo(); },
+  token(){ return ls.get("at_token")||""; },
+  headers(extra={}){ const h={"Accept":"application/vnd.github+json",...extra}; const t=this.token(); if(t) h.Authorization="Bearer "+t; return h; },
+  url(p){ return `https://api.github.com/repos/${this.repo()}/${p}`; },
+  async getFile(){
+    const r=await fetch(this.url(`contents/${DB_FILE}?ref=main&t=${Date.now()}`),{headers:this.headers(),cache:"no-store"});
+    if(r.status===404) return null;
+    if(!r.ok) throw new Error(`GitHubから読み込めませんでした (${r.status})`);
+    const j=await r.json();
+    let content=j.content? new TextDecoder().decode(b64d(j.content.replace(/\n/g,""))) : null;
+    if(!content){ // 1MBを超えた場合
+      const r2=await fetch(this.url(`git/blobs/${j.sha}`),{headers:this.headers({"Accept":"application/vnd.github.raw"})});
+      content=await r2.text();
+    }
+    return {sha:j.sha,content};
+  },
+  async putFile(content,sha,msg){
+    if(!this.token()) throw new Error("GitHubのトークンが未設定です（設定画面で入れてください）");
+    const body={message:msg,content:b64e(new TextEncoder().encode(content)),branch:"main"}; if(sha) body.sha=sha;
+    const r=await fetch(this.url(`contents/${DB_FILE}`),{method:"PUT",headers:this.headers({"Content-Type":"application/json"}),body:JSON.stringify(body)});
+    if(r.status===409||r.status===422) { const e=new Error("conflict"); e.conflict=true; throw e; }
+    if(!r.ok) throw new Error(`保存に失敗しました (${r.status}) ${(await r.text()).slice(0,120)}`);
+    return (await r.json()).content.sha;
+  },
+  async dispatch(){
+    if(!this.token()) throw new Error("GitHubのトークンが未設定です（設定画面で入れてください）");
+    const r=await fetch(this.url(`actions/workflows/${WORKFLOW}/dispatches`),{method:"POST",headers:this.headers({"Content-Type":"application/json"}),body:JSON.stringify({ref:"main"})});
+    if(!r.ok) throw new Error(`更新の開始に失敗しました (${r.status})`);
+  }
+};
+
+/* ====================== 状態 ====================== */
+let DB=null, SHA=null, PW=null;
+const UI={range:0,cur:"jpy",hist:"rec",sort:{key:"value",dir:-1}};
+
+async function load(){
+  const f=await gh.getFile();
+  if(!f) return false;
+  DB=await decryptDb(f.content,PW); SHA=f.sha; return true;
+}
+/* 最新を取り直してから変更→暗号化→保存（自動更新との競合に強くする） */
+async function save(mutator,msg="data: ページから更新"){
+  for(let i=0;i<4;i++){
+    const f=await gh.getFile();
+    const cur=f? await decryptDb(f.content,PW) : DB;
+    mutator(cur);
+    try{ SHA=await gh.putFile(await encryptDb(cur,PW),f?f.sha:null,msg); DB=cur; render(); return; }
+    catch(e){ if(!e.conflict) throw e; await new Promise(r=>setTimeout(r,800)); }
+  }
+  throw new Error("他の更新と重なったため保存できませんでした。少し待って再度お試しください");
+}
+async function guarded(btn,fn){
+  const old=btn?btn.textContent:""; if(btn){btn.disabled=true;btn.textContent="保存中…";}
+  try{ await fn(); } catch(e){ console.error(e); toast(e.message||String(e),5000); }
+  finally{ if(btn){btn.disabled=false;btn.textContent=old;} }
+}
+
+/* ====================== 計算（Python側と同じ式） ====================== */
+function ibkrValue(ib){
+  if(!ib.positions||!ib.positions.length) return +ib.manual_value||0;
+  let v=0; for(const p of ib.positions){
+    const rate=(p.currency||"USD")!=="USD"?(p.fx_to_base||1):1;
+    if(["STK","ETF"].includes(p.asset||"STK")&&p.price) v+=p.qty*p.price*rate; else v+=(p.mark_value||0)*(p.fx_to_base||1);
+  } return v+(+ib.cash||0);
+}
+const ftValue = ft => ft.positions.reduce((a,p)=>a+p.qty*p.price,0)+(+ft.cash||0);
+function totals(db){
+  const fx=db.fx.rate, ib=ibkrValue(db.ibkr), ft=ftValue(db.firstrade);
+  const parts={ibkr:ib,firstrade:ft,crypto:0,usd_cash:0,jpy:0}; let usd=ib+ft;
+  for(const m of db.manual){ if(m.currency==="USD"){ usd+=m.value; parts[m.category==="crypto"?"crypto":"usd_cash"]+=m.value; } else parts.jpy+=m.value; }
+  const jpy=usd*fx+parts.jpy; return {jpy,usd:jpy/fx,fx,parts};
+}
+const hist = () => [...DB.history].sort((a,b)=>a.t<b.t?-1:1);
+
+/* ====================== 描画 ====================== */
+function render(){
+  if(!DB) return;
+  renderDash(); renderStocks(); renderManual(); renderHistory(); renderAnnual(); renderSettings();
+}
+
+function renderDash(){
+  const T=totals(DB), H=hist();
+  $("#heroJpy").textContent=fmtJ(T.jpy);
+  $("#heroUsd").textContent=fmtU(T.usd)+"　ドル円 "+fmtN(T.fx,2);
+  const usdAll=T.parts.ibkr+T.parts.firstrade+T.parts.crypto+T.parts.usd_cash;
+  $("#heroParts").innerHTML=`<div class="legend-row"><span>ドル資産</span><span class="spacer"></span><span class="num">${fmtU(usdAll)}</span><span class="muted num" style="width:120px;text-align:right">${fmtJ(usdAll*T.fx)}</span></div>
+    <div class="legend-row"><span>円資産（借入差し引き後）</span><span class="spacer"></span><span class="num">${fmtJ(T.parts.jpy)}</span></div>`;
+  $("#heroMeta").textContent=`最終の自動更新: ${DB.updated_at?fmtDate(DB.updated_at)+"（"+ago(DB.updated_at)+"）":"まだありません"}`;
+  // 前回の記録
+  const recs=H.filter(h=>h.kind!=="auto"); const lastRec=recs[recs.length-1];
+  setKpi("kPrev",lastRec?T.jpy-lastRec.jpy:null,lastRec?`${fmtDate(lastRec.t,false)} ${fmtJ(lastRec.jpy)} から`:"");
+  // 24時間
+  const dayAgo=Date.now()-864e5; const p24=[...H].reverse().find(h=>new Date(h.t)<=dayAgo&&h.kind==="auto");
+  setKpi("k24",p24?T.jpy-p24.jpy:null,p24?fmtP((T.jpy-p24.jpy)/p24.jpy):"自動記録が24時間分たまると表示");
+  // 年初来
+  const y=J(Date.now()).y; $("#kYtdLabel").textContent=`${y}年 年初来`;
+  const base=[...H].reverse().find(h=>fmtDate(h.t,false)===`${y}/1/1`) || [...H].reverse().find(h=>new Date(h.t).getTime()<jstYearStart(y));
+  setKpi("kYtd",base?T.jpy-base.jpy:null,base?`${fmtDate(base.t,false)} ${fmtJ(base.jpy)} から ${fmtP((T.jpy-base.jpy)/base.jpy)}`:"");
+  // 最高
+  const mx=H.reduce((m,h)=>h.jpy>(m?m.jpy:-Infinity)?h:m,null); const maxV=Math.max(mx?mx.jpy:0,T.jpy);
+  $("#kMax").textContent=fmtJ(maxV);
+  $("#kMaxSub").textContent = T.jpy>=maxV-1 ? "今が最高値です" : `最高値から ${fmtP((T.jpy-maxV)/maxV)}（${mx?fmtDate(mx.t,false):""}）`;
+  drawMain(H,T); drawDonut(T); drawYears(H,T);
+}
+function setKpi(id,v,sub){ const e=$("#"+id); e.textContent=fmtJ(v,true); e.className="v num "+cls(v); $("#"+id+"Sub").textContent=sub||""; }
+
+const SVGNS="http://www.w3.org/2000/svg";
+function niceTicks(min,max,n=5){ const span=max-min||Math.abs(max)||1; const step0=span/n; const mag=10**Math.floor(Math.log10(step0));
+  const step=[1,2,2.5,5,10].map(m=>m*mag).find(s=>s>=step0); const out=[]; for(let v=Math.ceil(min/step)*step; v<=max+1e-9; v+=step) out.push(v); return out; }
+function drawMain(H,T){
+  const box=$("#chartMain"); box.innerHTML="";
+  const pts=[...H,{t:new Date().toISOString(),jpy:T.jpy,usd:T.usd,kind:"now",memo:""}];
+  const from=UI.range?Date.now()-UI.range*864e5:0;
+  let data=pts.filter(h=>new Date(h.t).getTime()>=from);
+  if(UI.cur==="usd") data=data.filter(h=>h.usd!=null);
+  data=data.map(h=>({x:new Date(h.t).getTime(),y:UI.cur==="usd"?h.usd:h.jpy,h}));
+  if(data.length<2){ box.innerHTML='<div class="sub" style="padding:40px 0;text-align:center">この期間のデータがまだありません</div>'; return; }
+  const W=box.clientWidth||600, Hh=box.clientHeight||320, m={l:58,r:14,t:12,b:26};
+  const xs=data.map(d=>d.x), ys=data.map(d=>d.y);
+  const x0=Math.min(...xs), x1=Math.max(...xs); let y0=Math.min(...ys), y1=Math.max(...ys); const pad=(y1-y0)*.08||y1*.02; y0-=pad; y1+=pad;
+  const yt=niceTicks(y0,y1,4); y0=Math.min(y0,yt[0]); y1=Math.max(y1,yt[yt.length-1]);
+  const X=v=>m.l+(v-x0)/(x1-x0||1)*(W-m.l-m.r), Y=v=>m.t+(1-(v-y0)/(y1-y0||1))*(Hh-m.t-m.b);
+  const svg=document.createElementNS(SVGNS,"svg"); svg.setAttribute("viewBox",`0 0 ${W} ${Hh}`);
+  const line=css("--s1"), memoC=css("--s2");
+  let g=`<defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${line}" stop-opacity=".22"/><stop offset="1" stop-color="${line}" stop-opacity="0"/></linearGradient></defs>`;
+  const yfmt=v=>UI.cur==="usd"?"$"+Math.round(v/1000)+"k":(v/1e6).toFixed(v%1e6?1:0).replace(/\.0$/,"")+"百万";
+  for(const v of yt) g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)"/><text class="ax" x="${m.l-8}" y="${Y(v)+4}" text-anchor="end">${yfmt(v)}</text>`;
+  // x目盛り
+  const span=(x1-x0)/864e5, nX=Math.max(2,Math.floor((W-m.l-m.r)/90));
+  for(let i=0;i<=nX;i++){ const v=x0+(x1-x0)*i/nX, d=J(v);
+    const lab=span<=3?`${d.m}/${d.d} ${d.h}時`:span<=400?`${d.m}/${d.d}`:`${String(d.y).slice(2)}/${d.m}`;
+    g+=`<text class="ax" x="${X(v)}" y="${Hh-6}" text-anchor="${i===0?"start":i===nX?"end":"middle"}">${lab}</text>`; }
+  const path=data.map((d,i)=>(i?"L":"M")+X(d.x).toFixed(1)+","+Y(d.y).toFixed(1)).join("");
+  g+=`<path d="${path}L${X(x1)},${Hh-m.b}L${X(x0)},${Hh-m.b}Z" fill="url(#ag)"/><path d="${path}" fill="none" stroke="${line}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  for(const d of data){ if(d.h.memo) g+=`<circle cx="${X(d.x)}" cy="${Y(d.y)}" r="5.5" fill="${memoC}" stroke="var(--surface)" stroke-width="2"/>`;
+    else if((d.h.kind==="snapshot"||d.h.kind==="import")&&data.length<150) g+=`<circle cx="${X(d.x)}" cy="${Y(d.y)}" r="2.5" fill="${line}"/>`; }
+  const last=data[data.length-1]; g+=`<circle cx="${X(last.x)}" cy="${Y(last.y)}" r="4.5" fill="${line}" stroke="var(--surface)" stroke-width="2"/>`;
+  g+=`<g id="hov" style="display:none"><line id="hovL" y1="${m.t}" y2="${Hh-m.b}" stroke="var(--muted)" stroke-dasharray="3 3"/><circle id="hovC" r="5" fill="${line}" stroke="var(--surface)" stroke-width="2"/></g>`;
+  g+=`<rect x="${m.l}" y="0" width="${W-m.l-m.r}" height="${Hh}" fill="transparent" id="hovR"/>`;
+  svg.innerHTML=g; box.appendChild(svg);
+  const tip=document.createElement("div"); tip.className="tip hidden"; box.appendChild(tip);
+  const move=e=>{ const r=svg.getBoundingClientRect(); const px=(e.clientX-r.left)*W/r.width;
+    let best=data[0]; for(const d of data) if(Math.abs(X(d.x)-px)<Math.abs(X(best.x)-px)) best=d;
+    // メモ付きの点が近ければ優先
+    const memo=data.filter(d=>d.h.memo&&Math.abs(X(d.x)-px)<10)[0]; if(memo) best=memo;
+    const cx=X(best.x), cy=Y(best.y);
+    svg.querySelector("#hov").style.display=""; svg.querySelector("#hovL").setAttribute("x1",cx); svg.querySelector("#hovL").setAttribute("x2",cx);
+    svg.querySelector("#hovC").setAttribute("cx",cx); svg.querySelector("#hovC").setAttribute("cy",cy);
+    tip.innerHTML=`<div>${fmtDate(best.x,best.h.kind!=="import")}${best.h.kind==="now"?"（現在）":""}</div><b class="num">${UI.cur==="usd"?fmtU(best.y):fmtJ(best.y)}</b>${best.h.memo?`<div style="margin-top:3px">📝 ${esc(best.h.memo)}</div>`:""}`;
+    tip.classList.remove("hidden"); const left=cx*r.width/W; tip.style.left=Math.min(Math.max(left,90),r.width-90)+"px"; tip.style.top=(cy*r.height/Hh)+"px"; };
+  const hide=()=>{ svg.querySelector("#hov").style.display="none"; tip.classList.add("hidden"); };
+  const R=svg.querySelector("#hovR"); R.addEventListener("pointermove",move); R.addEventListener("pointerdown",move); R.addEventListener("pointerleave",hide);
+}
+window.addEventListener("resize",()=>{ clearTimeout(window._rz); window._rz=setTimeout(()=>{ if(DB) renderDash(); },150); });
+
+function drawDonut(T){
+  const keys=Object.keys(CAT).filter(k=>Math.abs(T.parts[k])>0.5);
+  const vals=keys.map(k=>k==="jpy"?T.parts.jpy:T.parts[k]*T.fx);
+  const pos=vals.map(v=>Math.max(v,0)); const sum=pos.reduce((a,b)=>a+b,0)||1;
+  const colors=keys.map(k=>css(CAT[k].color));
+  const S=170, c=S/2, R=c-4, r=R*0.64; let a=-Math.PI/2, g="";
+  const gap=0.012;
+  pos.forEach((v,i)=>{ if(v<=0) return; const da=v/sum*Math.PI*2; const s=a+gap, e=a+da-gap; a+=da; if(e<=s) return;
+    const large=e-s>Math.PI?1:0, P=(rad,ang)=>[c+rad*Math.cos(ang),c+rad*Math.sin(ang)];
+    const [x1,y1]=P(R,s),[x2,y2]=P(R,e),[x3,y3]=P(r,e),[x4,y4]=P(r,s);
+    g+=`<path d="M${x1},${y1}A${R},${R} 0 ${large} 1 ${x2},${y2}L${x3},${y3}A${r},${r} 0 ${large} 0 ${x4},${y4}Z" fill="${colors[i]}"><title>${CAT[keys[i]].name}: ${fmtJ(vals[i])}（${fmtP(v/sum,false)}）</title></path>`; });
+  g+=`<text x="${c}" y="${c-4}" text-anchor="middle" class="ax">総資産</text><text x="${c}" y="${c+14}" text-anchor="middle" style="fill:var(--text);font-size:14px;font-weight:600">${(T.jpy/1e6).toFixed(1)}百万円</text>`;
+  $("#chartDonut").innerHTML=`<svg viewBox="0 0 ${S} ${S}">${g}</svg>`;
+  $("#allocList").innerHTML=keys.map((k,i)=>`<div class="legend-row"><span class="sw" style="background:${colors[i]}"></span><span>${CAT[k].name}</span><span class="spacer"></span><span class="num">${fmtJ(vals[i])}</span><span class="muted num" style="width:52px;text-align:right">${vals[i]<0?"":fmtP(pos[i]/sum,false)}</span></div>`).join("");
+}
+
+function drawYears(H,T){
+  const byYear={}; for(const h of H){ const j=J(h.t); byYear[(j.m===1&&j.d===1&&h.kind==="import")?j.y-1:j.y]=h.jpy; }
+  byYear[J(Date.now()).y]=T.jpy;
+  const years=Object.keys(byYear).map(Number).sort();
+  const first=H[0];
+  const rows=years.map((y,i)=>{ const prev=i?byYear[years[i-1]]:first.jpy; const d=byYear[y]-prev;
+    return `<tr><td>${y}${i===0?`<span class="muted">（${fmtDate(first.t,false)}〜）</span>`:""}</td><td class="num">${fmtJ(byYear[y])}</td><td class="num ${cls(d)}">${fmtJ(d,true)}</td><td class="num ${cls(d)}">${fmtP(d/prev)}</td></tr>`; });
+  $("#tblYears tbody").innerHTML=rows.reverse().join("");
+}
+
+/* ---------- 株 ---------- */
+function stockTable(el,positions,total,opts={}){
+  const cols=[["symbol","銘柄",1],["qty","株数"],["price","株価"],["value","評価額"],["cost","取得額"],["pl","損益"],["plp","損益率"],["w","比率"]];
+  const rows=positions.map(p=>{const value=p.qty*p.price*(p.rate||1)||p.mark_value||0, cost=p.qty*p.unit_cost*(p.rate||1); return {...p,value,cost,pl:value-cost,plp:cost?(value-cost)/cost:null,w:total?value/total:0};});
+  const {key,dir}=UI.sort; rows.sort((a,b)=>key==="symbol"?dir*String(a.symbol).localeCompare(b.symbol):dir*((a[key]??-1e18)-(b[key]??-1e18)));
+  const sumV=rows.reduce((a,r)=>a+r.value,0), sumC=rows.reduce((a,r)=>a+r.cost,0);
+  el.innerHTML=`<thead><tr>${cols.map(c=>`<th class="sortable ${c[2]?"l":""}" data-k="${c[0]}">${c[1]}${key===c[0]?(dir>0?" ▲":" ▼"):""}</th>`).join("")}</tr></thead><tbody>`+
+    rows.map(r=>`<tr><td><b>${esc(r.symbol)}</b> <span class="muted">${esc((r.name||"").slice(0,22))}</span></td><td class="num">${fmtN(r.qty,r.qty%1?4:0)}</td><td class="num">${fmtU(r.price,false,2)}</td><td class="num">${fmtU(r.value)}</td><td class="num">${fmtU(r.cost)}</td><td class="num ${cls(r.pl)}">${fmtU(r.pl,true)}</td><td class="num ${cls(r.pl)}">${fmtP(r.plp)}</td><td><div class="num">${fmtP(r.w,false)}</div><div class="bar"><i style="width:${(r.w*100).toFixed(1)}%;background:${css(opts.color||"--s1")}"></i></div></td></tr>`).join("")+
+    (opts.cash!=null?`<tr><td><b>現金</b></td><td></td><td></td><td class="num">${fmtU(opts.cash)}</td><td></td><td></td><td></td><td class="num">${fmtP(total?opts.cash/total:0,false)}</td></tr>`:"")+
+    `<tr><td><b>合計</b></td><td></td><td></td><td class="num"><b>${fmtU(sumV+(opts.cash||0))}</b></td><td class="num">${fmtU(sumC)}</td><td class="num ${cls(sumV-sumC)}">${fmtU(sumV-sumC,true)}</td><td class="num ${cls(sumV-sumC)}">${fmtP(sumC?(sumV-sumC)/sumC:null)}</td><td></td></tr></tbody>`;
+  el.querySelectorAll("th.sortable").forEach(th=>th.onclick=()=>{const k=th.dataset.k; UI.sort={key:k,dir:UI.sort.key===k?-UI.sort.dir:-1}; renderStocks();});
+}
+function renderStocks(){
+  const fx=DB.fx.rate, ib=DB.ibkr, ft=DB.firstrade, ibv=ibkrValue(ib), ftv=ftValue(ft), dep=DB.settings.ibkr_initial_deposit||0;
+  $("#stTotal").textContent=fmtU(ibv+ftv); $("#stTotalJpy").textContent=fmtJ((ibv+ftv)*fx);
+  $("#stIb").textContent=fmtU(ibv);
+  $("#stIbSub").innerHTML=dep?`初期入金 ${fmtU(dep,false,2)} から <span class="${cls(ibv-dep)}">${fmtU(ibv-dep,true)}（${fmtP((ibv-dep)/dep)}）</span>`:"";
+  const ftCost=ft.positions.reduce((a,p)=>a+p.qty*p.unit_cost,0), ftPos=ftv-(+ft.cash||0);
+  $("#stFt").textContent=fmtU(ftv);
+  $("#stFtSub").innerHTML=`取得額 ${fmtU(ftCost)} から <span class="${cls(ftPos-ftCost)}">${fmtU(ftPos-ftCost,true)}（${fmtP((ftPos-ftCost)/ftCost)}）</span>`;
+  const hasIb=ib.positions&&ib.positions.length;
+  $("#ibManualBox").classList.toggle("hidden",!!hasIb); $("#ibTableBox").classList.toggle("hidden",!hasIb);
+  $("#ibManualVal").value=ib.manual_value??"";
+  $("#ibMeta").innerHTML=hasIb?`<span class="tag auto">自動</span> 保有: ${ago(ib.flex_at)}に取得 ・ 株価: ${ago(ib.live_at)}`:`<span class="tag manual">手入力</span>`;
+  if(hasIb) stockTable($("#tblIb"),ib.positions.map(p=>({...p,rate:(p.currency||"USD")!=="USD"?(p.fx_to_base||1):1})),ibv,{cash:+ib.cash||0,color:"--s1"});
+  $("#ftMeta").innerHTML=`<span class="tag auto">株価は自動</span> 株数は取り込み（${fmtDate(ft.imported_at,false)}）＋自動の推定反映`;
+  stockTable($("#tblFt"),ft.positions,ftv,{cash:+ft.cash||0,color:"--s2"});
+  const tax=1-(DB.settings.div_withholding??0.1);
+  const divY=ft.positions.reduce((a,p)=>a+p.qty*(p.div_per_share||0),0)*tax;
+  $("#ftDivYear").textContent=fmtU(divY)+" / 年";
+  $("#ftDivSub").textContent=`月あたり 約${fmtU(divY/12)} ・ 利回り ${fmtP(divY/ftPos,false)}（取得額ベース ${fmtP(divY/ftCost,false)}）`;
+  $("#ftEvents").innerHTML=[...ft.events].reverse().slice(0,40).map(e=>`<div>${fmtDate(e.t)}　${esc(e.detail)}</div>`).join("")||"<div>まだありません</div>";
+}
+
+/* ---------- 手入力 ---------- */
+function renderManual(){
+  const stale=(DB.settings.stale_days||30)*864e5, fx=DB.fx.rate;
+  const card=m=>{ const old=Date.now()-new Date(m.updated_at)>stale; const isU=m.currency==="USD";
+    return `<div class="card ${old?"stale":""}" data-id="${esc(m.id)}">
+      <div class="row"><b style="font-size:14px">${esc(m.name)}</b><span class="spacer"></span><span class="tag manual">手入力</span></div>
+      <div class="val num ${m.value<0?"neg":""}" style="cursor:pointer" data-act="edit" title="押して書き換え">${isU?fmtU(m.value,false,0):fmtJ(m.value)}</div>
+      <div class="muted num">${isU?"≈ "+fmtJ(m.value*fx):""}</div>
+      ${m.memo?`<div class="sub" style="margin-top:4px">📝 ${esc(m.memo)}</div>`:""}
+      <div class="row" style="margin-top:8px"><span class="muted">更新: ${fmtDate(m.updated_at,false)}（${ago(m.updated_at)}）</span>${old?'<span class="stale-note">更新が古いです</span>':""}<span class="spacer"></span><button class="btn small ghost" data-act="edit">編集</button></div>
+    </div>`; };
+  const usd=DB.manual.filter(m=>m.currency==="USD"), jpy=DB.manual.filter(m=>m.currency!=="USD");
+  $("#accUsd").innerHTML=usd.map(card).join(""); $("#accJpy").innerHTML=jpy.map(card).join("");
+  $("#manUsdSum").textContent="合計 "+fmtU(usd.reduce((a,m)=>a+m.value,0));
+  $("#manJpySum").textContent="合計 "+fmtJ(jpy.reduce((a,m)=>a+m.value,0));
+  $$("#v-manual [data-act=edit]").forEach(b=>b.onclick=()=>editAccount(b.closest("[data-id]").dataset.id));
+}
+function editAccount(id){
+  const m=id?DB.manual.find(x=>x.id===id):{id:"",name:"",currency:"USD",category:"crypto",value:0,memo:""};
+  openModal(`<h2>${id?"口座を編集":"口座を追加"}</h2>
+    <label class="f">名前</label><input type="text" id="eaName" value="${esc(m.name)}">
+    <div class="grid g-2" style="gap:10px"><div><label class="f">通貨</label><select id="eaCur"><option value="USD">ドル</option><option value="JPY">円</option></select></div>
+    <div><label class="f">分類</label><select id="eaCat"><option value="crypto">Crypto</option><option value="cash">現金・預金</option><option value="stock">株</option><option value="private">未上場株</option><option value="loan">借入（マイナスで入力）</option><option value="other">その他</option></select></div></div>
+    <label class="f">金額</label><input type="number" step="any" id="eaVal" value="${m.value}" inputmode="decimal">
+    <label class="f">メモ</label><input type="text" id="eaMemo" value="${esc(m.memo)}">
+    <div class="row" style="margin-top:16px"><button class="btn primary" id="eaSave">保存</button><button class="btn" id="eaCancel">閉じる</button><span class="spacer"></span>${id?'<button class="btn danger small" id="eaDel">削除</button>':""}</div>`);
+  $("#eaCur").value=m.currency; $("#eaCat").value=m.category; setTimeout(()=>$("#eaVal").select(),50);
+  $("#eaCancel").onclick=closeModal;
+  $("#eaSave").onclick=()=>guarded($("#eaSave"),async()=>{
+    const v={name:$("#eaName").value.trim()||"名前なし",currency:$("#eaCur").value,category:$("#eaCat").value,value:parseFloat($("#eaVal").value)||0,memo:$("#eaMemo").value.trim(),updated_at:nowIso()};
+    await save(db=>{ if(id){ Object.assign(db.manual.find(x=>x.id===id),v); } else db.manual.push({id:"m"+Date.now(),...v}); },`data: ${v.name}を更新`);
+    closeModal(); toast("保存しました");
+  });
+  if(id) $("#eaDel").onclick=()=>{ if(!$("#eaDel").dataset.sure){$("#eaDel").dataset.sure=1;$("#eaDel").textContent="本当に削除";return;}
+    guarded($("#eaDel"),async()=>{ await save(db=>{db.manual=db.manual.filter(x=>x.id!==id);},"data: 口座を削除"); closeModal(); toast("削除しました"); }); };
+}
+
+/* ---------- 履歴 ---------- */
+function renderHistory(){
+  let H=hist();
+  if(UI.hist==="rec") H=H.filter(h=>h.kind!=="auto"||h.memo);
+  else if(UI.hist==="daily"){ const last={}; H.forEach((h,i)=>{ if(h.kind==="auto") last[h.t.slice(0,10)]=i; }); H=H.filter((h,i)=>h.kind!=="auto"||h.memo||last[h.t.slice(0,10)]===i); }
+  const kind={auto:'<span class="tag auto">自動</span>',snapshot:'<span class="tag memo">記録</span>',import:'<span class="tag">シート</span>'};
+  const rows=H.map((h,i)=>{ const d=i?h.jpy-H[i-1].jpy:null; return `<tr><td class="num">${fmtDate(h.t,h.kind!=="import")}</td><td class="l">${kind[h.kind]||""}</td><td class="num">${fmtJ(h.jpy)}</td><td class="num ${cls(d)}">${d==null?"":fmtJ(d,true)}</td><td class="num">${h.fx?fmtN(h.fx,2):""}</td><td class="l" style="white-space:normal;min-width:180px">${esc(h.memo)}</td><td><button class="btn small ghost" data-t="${esc(h.t)}">編集</button></td></tr>`; });
+  $("#tblHist tbody").innerHTML=rows.reverse().join("");
+  $$("#tblHist [data-t]").forEach(b=>b.onclick=()=>editHistory(b.dataset.t));
+}
+function editHistory(t){
+  const h=DB.history.find(x=>x.t===t);
+  openModal(`<h2>記録を編集</h2><div class="sub">${fmtDate(h.t)} ・ ${fmtJ(h.jpy)}</div>
+    <label class="f">総資産（円）</label><input type="number" id="ehVal" value="${h.jpy}">
+    <label class="f">メモ</label><textarea id="ehMemo" rows="3">${esc(h.memo)}</textarea>
+    <div class="row" style="margin-top:16px"><button class="btn primary" id="ehSave">保存</button><button class="btn" id="ehCancel">閉じる</button><span class="spacer"></span><button class="btn danger small" id="ehDel">削除</button></div>`);
+  $("#ehCancel").onclick=closeModal;
+  $("#ehSave").onclick=()=>guarded($("#ehSave"),async()=>{ const v=parseFloat($("#ehVal").value), memo=$("#ehMemo").value.trim();
+    await save(db=>{ const x=db.history.find(y=>y.t===t); if(x){ x.memo=memo; if(!isNaN(v)) x.jpy=v; } },"data: 履歴を編集"); closeModal(); toast("保存しました"); });
+  $("#ehDel").onclick=()=>{ if(!$("#ehDel").dataset.sure){$("#ehDel").dataset.sure=1;$("#ehDel").textContent="本当に削除";return;}
+    guarded($("#ehDel"),async()=>{ await save(db=>{db.history=db.history.filter(y=>y.t!==t);},"data: 履歴を削除"); closeModal(); toast("削除しました"); }); };
+}
+function snapshot(){
+  const T=totals(DB);
+  openModal(`<h2>今の状態を記録</h2><div class="sub">総資産 <b class="num">${fmtJ(T.jpy)}</b>（${fmtU(T.usd)}）を履歴に残します。</div>
+    <label class="f">メモ（大きく動いた理由など・任意）</label><textarea id="snMemo" rows="3" placeholder="例：税金支払いのため米国貯金額-$6,000"></textarea>
+    <div class="muted" style="margin-top:6px">手入力の口座を先に最新にしておくと正確です。</div>
+    <div class="row" style="margin-top:16px"><button class="btn primary" id="snSave">記録する</button><button class="btn" id="snCancel">閉じる</button></div>`);
+  $("#snCancel").onclick=closeModal;
+  $("#snSave").onclick=()=>guarded($("#snSave"),async()=>{ const memo=$("#snMemo").value.trim();
+    await save(db=>{ const t=totals(db); db.history.push({t:nowIso(),jpy:+t.jpy.toFixed(2),usd:+t.usd.toFixed(2),fx:t.fx,kind:"snapshot",memo,parts:Object.fromEntries(Object.entries(t.parts).map(([k,v])=>[k,+v.toFixed(2)]))}); },"data: スナップショット");
+    closeModal(); toast("記録しました"); });
+}
+
+/* ---------- 年次 ---------- */
+function renderAnnual(){
+  const A=[...DB.annual_crypto].sort((a,b)=>a.year-b.year);
+  const r=(lab,f,c)=>`<tr><td>${lab}</td>${A.map(a=>`<td class="num ${c?cls(f(a)):""}">${f(a)}</td>`).join("")}</tr>`;
+  $("#tblAnnual").innerHTML=`<thead><tr><th></th>${A.map(a=>`<th>${a.year}年 ${a.final?'<span class="tag">確定</span>':'<span class="tag auto">進行中</span>'}</th>`).join("")}</tr></thead><tbody>`+
+    `<tr><td>評価額</td>${A.map(a=>`<td class="num">${fmtJ(a.value_jpy)}<div class="muted">${fmtU(a.value_usd)}</div></td>`).join("")}</tr>`+
+    `<tr><td>前年評価額</td>${A.map(a=>`<td class="num">${fmtJ(a.prev_jpy)}<div class="muted">${fmtU(a.prev_usd)}</div></td>`).join("")}</tr>`+
+    `<tr><td>入金額</td>${A.map(a=>`<td class="num">${fmtJ(a.deposit_jpy)}<div class="muted">${fmtU(a.deposit_usd)}</div></td>`).join("")}</tr>`+
+    `<tr><td>出金額</td>${A.map(a=>`<td class="num">${fmtJ(a.withdraw_jpy)}<div class="muted">${fmtU(a.withdraw_usd)}</div></td>`).join("")}</tr>`+
+    `<tr><td><b>利益</b></td>${A.map(a=>`<td class="num ${cls(a.profit_jpy)}"><b>${fmtJ(a.profit_jpy,true)}</b><div>${fmtU(a.profit_usd,true)}</div></td>`).join("")}</tr>`+
+    `<tr><td>入出金時のドル円</td>${A.map(a=>`<td class="num">${fmtN(a.fx,2)}</td>`).join("")}</tr>`+
+    `<tr><td>メモ</td>${A.map(a=>`<td class="muted" style="white-space:normal">${esc(a.memo)}</td>`).join("")}</tr></tbody>`;
+  const pj=A.reduce((s,a)=>s+a.profit_jpy,0), pu=A.reduce((s,a)=>s+a.profit_usd,0);
+  $("#annualTotal").innerHTML=`累計利益 <b class="${cls(pj)}">${fmtJ(pj,true)}</b> ／ <b class="${cls(pu)}">${fmtU(pu,true,2)}</b>`;
+}
+
+/* ---------- 設定 ---------- */
+function renderSettings(){
+  const s=DB.settings;
+  $("#setRepo").value=gh.repo(); $("#setConnState").textContent=gh.token()?"トークン設定済み":"トークン未設定";
+  $("#setQqq").value=s.qqq_monthly_usd; $("#setTax").value=((s.div_withholding??0.1)*100).toFixed(1);
+  $("#setIbDep").value=s.ibkr_initial_deposit; $("#setStale").value=s.stale_days; $("#setFx").value=s.fx_manual||"";
+  $("#logBox").innerHTML=[...(DB.log||[])].reverse().map(l=>`<div class="${l.level}">${fmtDate(l.t)}　${esc(l.msg)}</div>`).join("");
+}
+
+/* ---------- 更新コード ---------- */
+let pendingOps=null;
+function parseCode(txt){
+  txt=txt.trim(); if(!txt.startsWith("AT1:")) throw new Error("更新コードの形式が違います（AT1: で始まります）");
+  return JSON.parse(new TextDecoder().decode(b64d(txt.slice(4).replace(/\s/g,""))));
+}
+function describeOp(o){
+  switch(o.op){
+    case "set_position": return `${o.broker} ${o.symbol}: 株数 ${o.qty} / 取得単価 $${o.unit_cost}`;
+    case "remove_position": return `${o.broker} ${o.symbol} を削除`;
+    case "set": return `${o.path} = ${JSON.stringify(o.value)}`;
+    case "event": return `ログ追加: ${o.detail}`;
+    default: return "不明な操作: "+o.op;
+  }
+}
+function applyOps(db,ops){
+  for(const o of ops){
+    if(o.op==="set_position"){ const list=db[o.broker].positions; let p=list.find(x=>x.symbol===o.symbol);
+      if(!p){ p={symbol:o.symbol,name:o.name||o.symbol,qty:0,unit_cost:0,price:o.price||0}; list.push(p); }
+      p.qty=o.qty; p.unit_cost=o.unit_cost; if(o.name) p.name=o.name; if(o.div_per_share!=null) p.div_per_share=o.div_per_share; }
+    else if(o.op==="remove_position"){ db[o.broker].positions=db[o.broker].positions.filter(x=>x.symbol!==o.symbol); }
+    else if(o.op==="set"){ const k=o.path.split("."); let t=db; while(k.length>1) t=t[k.shift()]; t[k[0]]=o.value; }
+    else if(o.op==="event"){ (db[o.broker||"firstrade"].events ||= []).push({t:nowIso(),type:"correction",detail:o.detail}); }
+  }
+}
+
+/* ====================== モーダル・操作 ====================== */
+function openModal(html){ $("#modalBody").innerHTML=html; $("#modal").classList.remove("hidden"); }
+function closeModal(){ $("#modal").classList.add("hidden"); }
+$("#modal").addEventListener("click",e=>{ if(e.target.id==="modal") closeModal(); });
+
+$("#tabs").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; showView(b.dataset.v); });
+function showView(v){ $$("#tabs button").forEach(b=>b.toggleAttribute("aria-current",b.dataset.v===v)); $$("#tabs button").forEach(b=>{ if(b.dataset.v===v) b.setAttribute("aria-current","page"); });
+  $$("section.view").forEach(s=>s.classList.toggle("active",s.id==="v-"+v)); if(location.hash!=="#"+v) history.replaceState(null,"","#"+v); if(v==="dash"&&DB) renderDash(); }
+window.addEventListener("hashchange",()=>showView((location.hash||"#dash").slice(1)));
+$("#segRange").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; UI.range=+b.dataset.r; $$("#segRange button").forEach(x=>x.classList.toggle("on",x===b)); renderDash(); });
+$("#segCur").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; UI.cur=b.dataset.c; $$("#segCur button").forEach(x=>x.classList.toggle("on",x===b)); renderDash(); });
+$("#segHist").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return; UI.hist=b.dataset.h; $$("#segHist button").forEach(x=>x.classList.toggle("on",x===b)); renderHistory(); });
+$("#btnSnap").onclick=snapshot;
+$("#btnAddAcc").onclick=()=>editAccount(null);
+$("#ibManualSave").onclick=()=>guarded($("#ibManualSave"),async()=>{ const v=parseFloat($("#ibManualVal").value)||0; await save(db=>{db.ibkr.manual_value=v;},"data: IBKR手入力"); toast("保存しました"); });
+$("#btnRefresh").onclick=()=>guarded($("#btnRefresh"),async()=>{
+  const before=DB.updated_at; await gh.dispatch(); toast("GitHubで取得を開始しました。1〜2分で反映されます",4000);
+  for(let i=0;i<14;i++){ await new Promise(r=>setTimeout(r,15000)); try{ await load(); }catch(e){} if(DB.updated_at!==before){ render(); toast("最新のデータに更新しました"); return; } }
+  toast("まだ反映されていません。少し後にページを開き直してください",5000);
+});
+$("#setConnSave").onclick=()=>{ ls.set("at_repo",$("#setRepo").value.trim()); const t=$("#setToken").value.trim(); if(t) ls.set("at_token",t); $("#setToken").value=""; renderSettings(); toast("この端末に保存しました"); };
+$("#setSave").onclick=()=>guarded($("#setSave"),async()=>{ const s={qqq_monthly_usd:parseFloat($("#setQqq").value)||0,div_withholding:(parseFloat($("#setTax").value)||0)/100,ibkr_initial_deposit:parseFloat($("#setIbDep").value)||0,stale_days:parseInt($("#setStale").value)||30,fx_manual:parseFloat($("#setFx").value)||null};
+  await save(db=>{ Object.assign(db.settings,s); if(s.fx_manual) db.fx={rate:s.fx_manual,at:nowIso(),source:"手動"}; },"data: 設定を変更"); toast("保存しました"); });
+$("#codePreview").onclick=()=>{ const out=$("#codeOut"); out.classList.remove("hidden");
+  try{ const c=parseCode($("#codeIn").value); pendingOps=c.ops||[]; out.innerHTML=`<div><b>${esc(c.title||"更新コード")}</b>（${pendingOps.length}件）</div>`+pendingOps.map(o=>`<div>・${esc(describeOp(o))}</div>`).join(""); $("#codeApply").disabled=false; }
+  catch(e){ pendingOps=null; out.innerHTML=`<div class="warn">${esc(e.message)}</div>`; $("#codeApply").disabled=true; } };
+$("#codeApply").onclick=()=>guarded($("#codeApply"),async()=>{ const ops=pendingOps; await save(db=>applyOps(db,ops),"data: 更新コードを取り込み"); $("#codeIn").value=""; $("#codeOut").classList.add("hidden"); $("#codeApply").disabled=true; toast("取り込みました"); });
+$("#btnBackup").onclick=async()=>{ try{ await navigator.clipboard.writeText(JSON.stringify(DB)); toast("コピーしました"); }catch(e){ toast("コピーできませんでした"); } };
+$("#btnLock").onclick=()=>{ ss.del("at_pw"); location.reload(); };
+
+/* ====================== ロック・初期設定 ====================== */
+async function unlock(pw){
+  PW=pw;
+  const ok=await load();
+  if(!ok){ PW=null; throw Object.assign(new Error("まだデータがありません。「初期設定」から始めてください"),{nodata:true}); }
+  $("#lockView").classList.add("hidden"); $("#appView").classList.remove("hidden");
+  render(); showView((location.hash||"#dash").slice(1)||"dash");
+}
+$("#lockForm").addEventListener("submit",async e=>{ e.preventDefault(); const pw=$("#lockPw").value; if(!pw) return;
+  $("#lockErr").textContent=""; $("#lockBtn").disabled=true; $("#lockBtn").textContent="確認中…";
+  try{ await unlock(pw); if($("#lockRemember").checked) ss.set("at_pw",pw); }
+  catch(err){ $("#lockErr").textContent = err.nodata?err.message : (err.name==="OperationError"?"パスワードが違います":(err.message||"開けませんでした")); }
+  finally{ $("#lockBtn").disabled=false; $("#lockBtn").textContent="開く"; } });
+$("#toSetup").onclick=()=>{ $("#lockView").classList.add("hidden"); $("#setupView").classList.remove("hidden"); $("#suRepo").value=gh.repo(); };
+$("#suBack").onclick=()=>{ $("#setupView").classList.add("hidden"); $("#lockView").classList.remove("hidden"); };
+$("#suGo").onclick=()=>guarded($("#suGo"),async()=>{
+  $("#suErr").textContent="";
+  const p1=$("#suPw1").value, p2=$("#suPw2").value, tok=$("#suToken").value.trim(), repo=$("#suRepo").value.trim(), file=$("#suFile").files[0];
+  try{
+    if(p1.length<10) throw new Error("パスワードは10文字以上にしてください（データを守る唯一の鍵です）"); if(p1!==p2) throw new Error("パスワードが一致しません");
+    if(!tok) throw new Error("トークンを貼ってください"); if(!/^[^/]+\/[^/]+$/.test(repo)) throw new Error("リポジトリは「ユーザー名/リポジトリ名」の形で入れてください");
+    if(!file) throw new Error("seed.json を選んでください");
+    ls.set("at_repo",repo); ls.set("at_token",tok);
+    const seed=JSON.parse(await file.text()); if(!seed.history||!seed.manual) throw new Error("seed.json の中身が正しくありません");
+    const existing=await gh.getFile(); if(existing) throw new Error("すでにデータがあります。上書きを防ぐため中止しました（作り直す場合はGitHubで data/db.enc を削除してください）");
+    PW=p1; await gh.putFile(await encryptDb(seed,p1),null,"data: 初期データ");
+    $("#setupView").classList.add("hidden"); await unlock(p1); toast("初期設定が完了しました",4000);
+  }catch(e){ $("#suErr").textContent=e.message; }
+});
+(async()=>{ const pw=ss.get("at_pw"); if(pw){ try{ await unlock(pw); }catch(e){ ss.del("at_pw"); } } })();
+</script>
+</body>
+</html>

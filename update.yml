@@ -1,0 +1,48 @@
+name: 資産データ更新
+
+on:
+  schedule:
+    - cron: "17 * * * *"   # 1時間ごと（毎時17分）
+  workflow_dispatch:         # ページの「今すぐ更新」ボタン / 手動実行
+    inputs:
+      force_flex:
+        description: "IBKR Flexを強制的に取り直す"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r scripts/requirements.txt
+      - name: 取得して保存
+        env:
+          DATA_PASSWORD: ${{ secrets.DATA_PASSWORD }}
+          IBKR_FLEX_TOKEN: ${{ secrets.IBKR_FLEX_TOKEN }}
+          IBKR_FLEX_QUERY: ${{ secrets.IBKR_FLEX_QUERY }}
+          FORCE_FLEX: ${{ github.event.inputs.force_flex == 'true' && '1' || '' }}
+        run: |
+          git config user.name "asset-bot"
+          git config user.email "asset-bot@users.noreply.github.com"
+          for i in 1 2 3; do
+            git fetch origin main && git reset --hard origin/main
+            python scripts/update.py
+            git add data/db.enc 2>/dev/null || true
+            if git diff --cached --quiet; then echo "変更なし"; exit 0; fi
+            git commit -m "data: 自動更新" -q
+            if git push origin HEAD:main; then exit 0; fi
+            echo "競合したので取り直します ($i)"; sleep 5
+          done
+          exit 1
